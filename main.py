@@ -69,80 +69,105 @@
 
 
 # 100% done - ISS Overhead Notifier project (without BONUS finished yet ...)
+# To do list:
+# If the ISS is close to my current position, VVV
+# and it is currently dark VVV
+# Then send me an email to tell me to look up.
+# BONUS: run the code every 60 seconds.
+# Your position is within +5 or -5 degrees of the ISS position.
+
+
+# 100% + To do list + BONUS done!
 import requests
 from datetime import datetime
 import pytz
 import smtplib
+import time
 
 MY_EMAIL = "wanyudevtest@gmail.com"
 PASSWORD = "btbgsmumwrcsdivg"
 RECEIVER = "wanyudevtest@yahoo.com"
 MY_LAT = 34.052235
 MY_LNG = -118.243683
+countdown_secs = 0
 
-response = requests.get("http://api.open-notify.org/iss-now.json")
-response.raise_for_status()
-data = response.json()
-# print(data)
-iss_latitude = float(data["iss_position"]["latitude"])
-iss_longitude = float(data["iss_position"]["longitude"])
+is_running = True
+while is_running:
 
-# print(iss_latitude, iss_longitude)
+    if countdown_secs == 0:
+        countdown_secs += 60
 
-parameters = {
-    "lat": MY_LAT,
-    "lng": MY_LNG,
-    "formatted": 0
-}
+        response = requests.get("http://api.open-notify.org/iss-now.json")
+        response.raise_for_status()
+        iss_data = response.json()
+        # print(iss_data)
 
-response = requests.get("https://api.sunrise-sunset.org/json", params=parameters)
-response.raise_for_status()
-data = response.json()
-# print(data)
+        iss_latitude = float(iss_data["iss_position"]["latitude"])
+        iss_longitude = float(iss_data["iss_position"]["longitude"])
+        # print(iss_latitude, iss_longitude)
 
-sunset = data["results"]["sunset"]
-# print(sunset)
-sunset_date = data["results"]["sunset"].split("T")[0].split("-")
-# print(sunset_date)
-sunset_hr = data["results"]["sunset"].split("T")[1].split(":")
-# print(sunset_hr)
-sunset = sunset_date + sunset_hr
-# print(sunset)
-# sunset = [int(i) for i in sunset[:3]]
-utc_datetime = datetime(year=int(sunset[0]), month=int(sunset[1]), day=int(sunset[2]),
-                        hour=int(sunset[3]), tzinfo=pytz.timezone("UTC"))
-# print(utc_datetime)
-pt_datetime = utc_datetime.astimezone(pytz.timezone("US/Pacific"))
-# print(pt_datetime)
-# print(type(pt_datetime))
-pt = pt_datetime.strftime("%Y-%m-%d %H")
-# print(type(pt))
-# print(pt[-2:])
-pt_hr = int(pt[-2:])
+        parameters = {
+            "lat": MY_LAT,
+            "lng": MY_LNG,
+            "formatted": 0
+        }
 
-time_now = datetime.now()
-# print(time_now)
-# print(time_now.hour)
+        response = requests.get("https://api.sunrise-sunset.org/json", params=parameters)
+        response.raise_for_status()
+        data = response.json()
+        # print(data)
 
-# If the ISS is close to my current position, VVV
-# and it is currently dark VVV
-# Then send me an email to tell me to look up.
-# BONUS: run the code every 60 seconds.
+        # sunset = data["results"]["sunset"]
+        # print(sunset)
+        sunset_date = data["results"]["sunset"].split("T")[0].split("-")
+        # print(sunset_date)
+        sunset_hr = data["results"]["sunset"].split("T")[1].split(":")
+        # print(sunset_hr)
+        sunset = sunset_date + sunset_hr
+        # print(sunset)
+        # sunset = [int(i) for i in sunset[:3]]
 
-# Your position is within +5 or -5 degrees of the ISS position.
+        utc_datetime = datetime(year=int(sunset[0]), month=int(sunset[1]), day=int(sunset[2]),
+                                hour=int(sunset[3]), tzinfo=pytz.timezone("UTC"))
+        # print(utc_datetime)
+        pt_datetime = utc_datetime.astimezone(pytz.timezone("US/Pacific"))
+        # print(pt_datetime)
+        # print(type(pt_datetime))
+        pt = pt_datetime.strftime("%Y-%m-%d %H")
+        # print(type(pt))
+        # print(pt[-2:])
+        pt_sunset = int(pt[-2:])
 
-lat_abs = abs(MY_LAT - iss_latitude)
-lng_abs = abs(MY_LNG - iss_longitude)
+        time_now = datetime.now()
+        # print(time_now)
+        # print(time_now.hour)
 
-if lat_abs <= 5 and lng_abs <= 5:
-    if time_now.hour >= pt_hr:
-        with smtplib.SMTP("smtp.gmail.com", port=587) as connection:
-            connection.starttls()
-            connection.login(user=MY_EMAIL, password=PASSWORD)
-            connection.sendmail(from_addr=MY_EMAIL,
-                                to_addrs=RECEIVER,
-                                msg=f"Subject:Hey LOOK UP!\n\n"
-                                    f"ISS is overhead! Take a good look of it")
+        lat_abs = abs(MY_LAT - iss_latitude)
+        lng_abs = abs(MY_LNG - iss_longitude)
+
+        if lat_abs <= 5 and lng_abs <= 5:
+            if time_now.hour >= pt_sunset:
+                with smtplib.SMTP("smtp.gmail.com", port=587) as connection:
+                    connection.starttls()
+                    connection.login(user=MY_EMAIL, password=PASSWORD)
+                    connection.sendmail(from_addr=MY_EMAIL,
+                                        to_addrs=RECEIVER,
+                                        msg=f"Subject:If you are in LA, LOOK UP!\n\n"
+                                            f"ISS (International Space Station) is overhead right now! "
+                                            f"Take a good look of it to see if you could see it!\n\n"
+                                            f"ISS Data: \n{iss_data}")
+
+        else:
+            with smtplib.SMTP("smtp.gmail.com", port=587) as connection:
+                connection.starttls()
+                connection.login(user=MY_EMAIL, password=PASSWORD)
+                connection.sendmail(from_addr=MY_EMAIL,
+                                    to_addrs=RECEIVER,
+                                    msg=f"Subject:See where ISS at!\n\n"
+                                        f"ISS (International Space Station) Data: \n{iss_data}")
+
+    time.sleep(1)
+    countdown_secs -= 1
 
 
 
